@@ -7,14 +7,14 @@ import numpy as np
 # seting inputs
 
 # number of piles variable
-pile_total_input = 7
+pile_total_input = 15
 
 pile_count = pile_total_input - 1
 
 # setting minimum and maximum pile reveal variable
-min_reveal = 4
+min_reveal = 3.75
 
-max_reveal = 6
+max_reveal = 4.5
 
 # creating a polygon from a QGIS layer input called Tracker_Polylines
 input_polylines = QgsProject.instance().mapLayersByName("Tracker_Polylines")[0]
@@ -109,6 +109,7 @@ print(final_df.head())
 # final_df.to_csv('finalnew.csv')
 
 # Define the layer type (in this case, a Point layer)
+### THIS IS THE SPOT
 
 layer = QgsVectorLayer(f"Point?crs={source_crs.authid()}", 'MyLayer', 'memory')
 
@@ -247,146 +248,34 @@ print('Linear Regression Complete')
 #output to csv
 # TODO: may need to have this work for both linux and windows
 
-df.to_csv('C:/Users/marco/Documents/output.csv', index=False)  # Windows
+# df.to_csv('/home/j/EarthCalc/PILES-CREATOR-main/df.csv', index=False)  # Windows
 
 #TASK LOAD THE DF BACK INTO QGIS AS A MEMORY VECTORY LAYER
 
+resultsLayer = QgsVectorLayer(f"Point?crs={source_crs.authid()}", 'MyLayer', 'memory')
 
-## CHATGPT CODE
+# Add fields (columns) to the layer
+resultsProvider = resultsLayer.dataProvider()
+resultsProvider.addAttributes([
+    QgsField('Tracker_ID', QVariant.Int),
+    QgsField('x', QVariant.Double),
+    QgsField('y', QVariant.Double),
+    QgsField('z terrain enter', QVariant.Double),
+    QgsField('slope', QVariant.Double),
+    QgsField('Tabletop_Elev', QVariant.Double),
+    QgsField('cf', QVariant.Double),
+    QgsField('pg', QVariant.Double),
+    QgsField('Pile_reveal', QVariant.Double),
+    QgsField('slope_label', QVariant.Double)
+])
+resultsLayer.updateFields()
 
-print(df.dtypes)
-
-# Define a mapping for Pandas dtypes to QVariant types
-# Define mapping for QgsField types to Python types
-qgis_to_python = {
-    'String': str,
-    'Integer': int,
-    'Real': float,
-    'Boolean': bool,
-}
-
-# Create a memory layer
-layer = QgsVectorLayer(f"Point?crs={source_crs.authid()}", "Dynamic Fields Layer", "memory")
-provider = layer.dataProvider()
-
-# Automatically infer fields from DataFrame columns
-fields = [
-    QgsField(col, QVariant.String if df[col].dtype == "object"
-             else QVariant.Int if "int" in str(df[col].dtype)
-             else QVariant.Double if "float" in str(df[col].dtype)
-             else QVariant.Bool if "bool" in str(df[col].dtype)
-             else QVariant.String)
-    for col in df.columns
-]
-# Add fields to the provider
-provider.addAttributes(fields)
-layer.updateFields()  # Make sure the fields are registered in the layer
-
-
-# Validate and add features
-for _, row in df.iterrows():
-    # Create geometry
-    try:
-        point = QgsPointXY(row['x'], row['y'])
-        geometry = QgsGeometry.fromPointXY(point)
-    except Exception as e:
-        print(f"Error creating geometry: {e}")
-        continue
-
-    # Validate attributes
-    attributes = []
-    for field in provider.fields():
-        field_name = field.name()
-        field_type = field.typeName()
-
-        try:
-            value = row[field_name]
-            # Ensure the value matches the expected type
-            if not isinstance(value, qgis_to_python[field_type]):
-                print(f"Type mismatch for field '{field_name}': Expected {field_type}, Got {type(value).__name__}")
-                # Attempt to cast if possible
-                if field_type == 'Integer':
-                    value = int(value)
-                elif field_type == 'Real':
-                    value = float(value)
-                elif field_type == 'Boolean':
-                    value = bool(value)
-                else:
-                    value = str(value)
-        except Exception as e:
-            print(f"Error processing field '{field_name}': {e}")
-            value = None  # Use None for invalid data
-
-        attributes.append(value)
-
-    # Create feature
+# Add features to the layer
+for index, row in df.iterrows():
     feature = QgsFeature()
-    feature.setGeometry(geometry)
-    feature.setAttributes(attributes)
+    feature.setGeometry(QgsGeometry.fromPointXY(QgsPointXY(row['x'], row['y'])))
+    feature.setAttributes([row['Tracker_ID'], row['x'], row['y'], row['z terrain enter'], row['slope'], row['Tabletop_Elev'], row['cf'], row['pg'], row['Pile_reveal'], row['slope_label']])
+    resultsProvider.addFeature(feature)
 
-    # Add feature to provider
-    if not provider.addFeature(feature):
-        print(f"Failed to add feature with attributes: {attributes}")
-
-# Update extents and add the layer to the project
-layer.updateExtents()
-QgsProject.instance().addMapLayer(layer)
-
-
-
-#
-# # Define which columns to extract dynamically
-# spatial_columns = ['x', 'y']  # Columns used for geometry
-# non_spatial_columns = [col for col in df.columns if col not in spatial_columns]
-# all_columns = non_spatial_columns + spatial_columns  # Preserve order
-#
-#
-# # Add features to the layer
-# for i, row in df.iterrows():
-#     # Create a point geometry from x and y
-#     # Create a new feature
-#     feature = QgsFeature()
-#     feature.setGeometry(QgsGeometry.fromPointXY(QgsPointXY(row['x'], row['y'])))
-#
-#     attributes = [row['Tracker_ID'],
-#                   row['x'],
-#                   row['y'],
-#                   row['z terrain enter'],
-#                   row['min_reveal'],
-#                   row['max_reveal'],
-#                   row['slope'],
-#                   row['intercept'],
-#                   row['y_regression'],
-#                   row['offset'],
-#                   row['Tabletop_Elev'],
-#                   row['z terrain min elev'],
-#                   row['z terrain max elev'],
-#                   row['cf'],
-#                   row['pg'],
-#                   row['Pile_reveal'],
-#                   row['slope_label']]
-#     # Extract attributes dynamically, skipping spatial columns
-#     feature.setAttributes(attributes)
-#
-#     # Add the feature to the provider
-# provider.addFeature(feature)
-#
-# # Update layer's extent to include all features
-# layer.updateExtents()
-#
-# QgsProject.instance().addMapLayer(layer)
-#
-#
-#
-# # Add the layer to the QGIS project
-#
-#
-# print("Layer with dynamic fields and x/y coordinates added successfully!")
-# # Check the number of fields
-# print(len(provider.fields()))
-# # Check the length of the attributes list
-# print(len(attributes))
-
-
-
+QgsProject.instance().addMapLayer(resultsLayer).setName('results')
 
