@@ -1,13 +1,75 @@
 #adding new field library needed
 from PyQt5.QtCore import QVariant
 from qgis.core import *
+from qgis.PyQt.QtWidgets import QMessageBox
 import pandas as pd
 import numpy as np
+import os
+
+#functions
+from qgis.core import QgsProject, QgsMapLayer, QgsMessageLog
+from qgis.PyQt.QtWidgets import QMessageBox
+import os
+
+def apply_style_to_layer(layer_name, style_file_name):
+    """
+    Apply a QGIS style file (.qml or .sld) from the plugin's folder to a vector layer.
+
+    :param layer_name: Name of the vector layer to apply the style to.
+    :param style_file_name: Name of the style file (with extension, e.g., 'style.qml') located in the plugin folder.
+    """
+    # Get the active QGIS project instance
+    project = QgsProject.instance()
+
+    # Find the layer by name
+    layer = next((l for l in project.mapLayers().values() if l.name() == layer_name), None)
+
+    if not layer:
+        QMessageBox.critical(None, "Error", f"Layer '{layer_name}' not found.")
+        return
+
+    if not isinstance(layer, QgsMapLayer):
+        QMessageBox.critical(None, "Error", f"'{layer_name}' is not a vector layer.")
+        return
+
+    # Get the plugin folder path
+    plugin_folder = os.path.dirname(os.path.abspath(__file__))
+
+    # Build the full path to the style file
+    style_file_path = os.path.join(plugin_folder, style_file_name)
+
+    if not os.path.exists(style_file_path):
+        QMessageBox.critical(None, "Error", f"Style file '{style_file_name}' not found in the plugin folder.")
+        return
+
+    # Apply the style to the layer
+    if style_file_name.endswith('.qml'):
+        if not layer.loadNamedStyle(style_file_path):
+            QMessageBox.critical(None, "Error", f"Failed to apply QML style '{style_file_name}'.")
+            return
+    elif style_file_name.endswith('.sld'):
+        if not layer.importSldStyle(style_file_path):
+            QMessageBox.critical(None, "Error", f"Failed to apply SLD style '{style_file_name}'.")
+            return
+    else:
+        QMessageBox.critical(None, "Error", "Unsupported style file format. Use .qml or .sld.")
+        return
+
+        # Refresh the layer and log success
+    layer.triggerRepaint()
+    QgsMessageLog.logMessage(
+        f"Style '{style_file_name}' applied to layer '{layer_name}'.",
+        "QGIS Plugin",
+        level=Qgis.Info
+    )
+    QMessageBox.information(None, "Success", f"Style '{style_file_name}' successfully applied to layer '{layer_name}'.")
+
+
 
 # seting inputs
 
 # number of piles variable
-pile_total_input = 9
+pile_total_input = 15
 
 pile_count = pile_total_input - 1
 
@@ -214,7 +276,7 @@ def calculate_cf(df_trackers):
 
     # Calculate CF based on z terrain elev vs z terrain min & max
     # place 0 everywhere and then only update 0 where the following conditions are met
-    df_trackers['cf'] = 0
+    df_trackers['cf'] = 0.00
     df_trackers.loc[df_trackers['z terrain enter'] > df_trackers['z terrain max elev'], 'cf'] = \
         df_trackers['z terrain max elev'] - df_trackers['z terrain enter']
     df_trackers.loc[df_trackers['z terrain enter'] < df_trackers['z terrain min elev'], 'cf'] = \
@@ -248,7 +310,7 @@ print('Linear Regression Complete')
 #output to csv
 # TODO: may need to have this work for both linux and windows
 
-# df.to_csv('x.csv', index=False)  # Windows
+df.to_csv('C:/Users/marco/Documents/x.csv', index=False)  # Windows
 
 #TASK LOAD THE DF BACK INTO QGIS AS A MEMORY VECTORY LAYER
 
@@ -274,8 +336,15 @@ resultsLayer.updateFields()
 for index, row in df.iterrows():
     feature = QgsFeature()
     feature.setGeometry(QgsGeometry.fromPointXY(QgsPointXY(row['x'], row['y'])))
-    feature.setAttributes([row['Tracker_ID'], row['x'], row['y'], row['z terrain enter'], row['slope'], row['Tabletop_Elev'], row['cf'], row['pg'], row['Pile_reveal'], row['slope_label']])
+    feature.setAttributes([row['Tracker_ID'], row['x'], row['y'],row['z terrain enter'], row['slope'], row['Tabletop_Elev'], row['cf'], row['pg'], row['Pile_reveal'], row['slope_label']])
     resultsProvider.addFeature(feature)
 
 QgsProject.instance().addMapLayer(resultsLayer).setName('results')
+print(df.dtypes)
+
+layer_name = "results"
+style_file_name = "CF_Style_updated.qml"
+
+# Call the function to apply the style
+apply_style_to_layer(layer_name, style_file_name)
 
