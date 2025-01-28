@@ -7,14 +7,14 @@ import numpy as np
 # seting inputs
 
 # number of piles variable
-pile_total_input = 15
+pile_total_input = 9
 
 pile_count = pile_total_input - 1
 
 # setting minimum and maximum pile reveal variable
-min_reveal = 3.75
+min_reveal = 4.00
 
-max_reveal = 4.5
+max_reveal = 5.00
 
 # creating a polygon from a QGIS layer input called Tracker_Polylines
 input_polylines = QgsProject.instance().mapLayersByName("Tracker_Polylines")[0]
@@ -248,7 +248,7 @@ print('Linear Regression Complete')
 #output to csv
 # TODO: may need to have this work for both linux and windows
 
-# df.to_csv('/home/j/EarthCalc/PILES-CREATOR-main/df.csv', index=False)  # Windows
+# df.to_csv('x.csv', index=False)  # Windows
 
 #TASK LOAD THE DF BACK INTO QGIS AS A MEMORY VECTORY LAYER
 
